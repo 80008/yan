@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>LeanCloud 实时留言板</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; }
+    #messages { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll; margin-bottom: 10px; }
+    .msg { margin: 5px 0; }
+    #name, #message { width: 100%; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <h2>留言板（LeanCloud 实时同步）</h2>
+  <div id="messages"></div>
+  <input type="text" id="name" placeholder="你的名字">
+  <textarea id="message" placeholder="写点什么..." rows="3"></textarea>
+  <button onclick="sendMessage()">发送</button>
+
+  <!-- LeanCloud SDK -->
+  <script src="https://unpkg.com/leancloud-realtime/dist/realtime.browser.min.js"></script>
+
+  <script>
+    // 🚨 替换成你自己的 LeanCloud AppID 和 AppKey
+    const APP_ID = 'IwogPISVgDBTZFveD6orVyv4-gzGzoHsz';
+    const APP_KEY = 'tSvZWkAoXJGUwNydArLF5u0z';
+
+    const clientId = 'user-' + Math.floor(Math.random() * 100000); // 自动生成唯一客户端名
+
+    const { Realtime } = AV;
+    const realtime = new Realtime({
+      appId: APP_ID,
+      appKey: APP_KEY,
+      region: 'cn', // 国内
+    });
+
+    let messageList = document.getElementById('messages');
+    let conversation;
+
+    realtime.createIMClient(clientId).then(client => {
+      return client.createConversation({
+        name: '留言板',
+        members: [], // 单聊天室
+        unique: true
+      });
+    }).then(c => {
+      conversation = c;
+      conversation.queryMessages({ limit: 100 }).then(messages => {
+        messages.forEach(msg => addMessage(msg));
+      });
+      conversation.on('message', addMessage);
+    }).catch(console.error);
+
+    function addMessage(message) {
+      const div = document.createElement('div');
+      div.className = 'msg';
+      const from = message.from || '匿名';
+      div.textContent = `[${from}] ${message.text}`;
+      messageList.appendChild(div);
+      messageList.scrollTop = messageList.scrollHeight;
+    }
+
+    function sendMessage() {
+      const name = document.getElementById('name').value || '匿名';
+      const text = document.getElementById('message').value.trim();
+      if (!text) return;
+      conversation.send(new AV.TextMessage(text), { transient: false }).then(() => {
+        document.getElementById('message').value = '';
+      });
+    }
+  </script>
+</body>
+</html>
