@@ -126,6 +126,12 @@
             margin-top: 10px;
             text-align: center;
         }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -144,31 +150,7 @@
                 <input type="password" id="login-password" placeholder="请输入密码">
             </div>
             <button onclick="login()">登录</button>
-            <div class="switch-form">
-                还没有账号？<a onclick="showRegister()">立即注册</a>
-            </div>
             <div id="login-error" class="error-msg"></div>
-        </div>
-
-        <!-- 注册表单 -->
-        <div id="register-section" class="hidden">
-            <h2>注册</h2>
-            <div class="form-group">
-                <label>用户名：</label>
-                <input type="text" id="reg-username" placeholder="请输入用户名">
-            </div>
-            <div class="form-group">
-                <label>密码：</label>
-                <input type="password" id="reg-password" placeholder="请输入密码">
-            </div>
-            <div class="form-group">
-                <label>邮箱（可选）：</label>
-                <input type="email" id="reg-email" placeholder="请输入邮箱">
-            </div>
-            <button onclick="register()">注册</button>
-            <button class="secondary-btn" onclick="showLogin()">返回登录</button>
-            <div id="register-error" class="error-msg"></div>
-            <div id="register-success" class="success-msg"></div>
         </div>
 
         <!-- 留言板 -->
@@ -186,7 +168,7 @@
             
             <h3>所有留言</h3>
             <div id="messages-container">
-                <p>正在加载留言...</p>
+                <p class="loading">正在加载留言...</p>
             </div>
         </div>
     </div>
@@ -195,24 +177,34 @@
     <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.2/dist/av-min.js"></script>
     
     <script>
-    
+        // ⚠️ 重要：请替换为你的 LeanCloud 应用信息
         AV.init({
-            appId: 'IwogPISVgDBTZFveD6orVyv4-gzGzoHsz',           
-            appKey: 'tSvZWkAoXJGUwNydArLF5u0z',         
-            serverURL: 'https://iwogpisv.lc-cn-n1-shared.com'    
+            appId: 'IwogPISVgDBTZFveD6orVyv4-gzGzoHsz',           // 替换为你的 AppID
+            appKey: 'tSvZWkAoXJGUwNydArLF5u0z',         // 替换为你的 AppKey
+            serverURL: 'https://iwogpisv.lc-cn-n1-shared.com'    // 替换为你的服务器地址
         });
 
         // 页面加载时检查登录状态
         window.onload = function() {
-            checkLoginStatus();
+            checkLoginStatusStrict();
         };
 
-        // 检查登录状态
-        function checkLoginStatus() {
-            const user = AV.User.current();
-            if (user) {
+        // 严格检查登录状态
+        async function checkLoginStatusStrict() {
+            try {
+                const user = AV.User.current();
+                if (!user || !user.isAuthenticated()) {
+                    console.log('用户未登录或认证失效');
+                    showLogin();
+                    return;
+                }
+                
+                // 向服务器验证登录是否有效
+                await user.fetch();
+                console.log('用户验证成功：', user.getUsername());
                 showMessageBoard(user);
-            } else {
+            } catch (error) {
+                console.error('登录验证失败：', error);
                 showLogin();
             }
         }
@@ -220,33 +212,32 @@
         // 显示登录页面
         function showLogin() {
             document.getElementById('login-section').classList.remove('hidden');
-            document.getElementById('register-section').classList.add('hidden');
             document.getElementById('message-section').classList.add('hidden');
             clearMessages();
         }
 
-        // 显示注册页面
-        function showRegister() {
-            document.getElementById('login-section').classList.add('hidden');
-            document.getElementById('register-section').classList.remove('hidden');
-            document.getElementById('message-section').classList.add('hidden');
-            clearMessages();
-        }
-
-        // 显示留言板
-        function showMessageBoard(user) {
-            document.getElementById('login-section').classList.add('hidden');
-            document.getElementById('register-section').classList.add('hidden');
-            document.getElementById('message-section').classList.remove('hidden');
-            document.getElementById('current-user').textContent = user.getUsername();
-            loadMessages();
+        // 显示留言板 - 安全版
+        async function showMessageBoard(user) {
+            try {
+                // 验证用户是否真的已登录
+                await user.fetch();
+                
+                document.getElementById('login-section').classList.add('hidden');
+                document.getElementById('message-section').classList.remove('hidden');
+                document.getElementById('current-user').textContent = user.getUsername();
+                
+                // 安全加载留言
+                loadMessages();
+            } catch (error) {
+                console.error('用户验证失败：', error);
+                alert('登录验证失败，请重新登录！');
+                showLogin();
+            }
         }
 
         // 清除错误信息
         function clearMessages() {
             document.getElementById('login-error').textContent = '';
-            document.getElementById('register-error').textContent = '';
-            document.getElementById('register-success').textContent = '';
         }
 
         // 登录功能
@@ -261,42 +252,11 @@
             
             try {
                 const user = await AV.User.logIn(username, password);
-                console.log('登录成功：', user);
+                console.log('登录成功：', user.getUsername());
                 showMessageBoard(user);
             } catch (error) {
                 console.error('登录失败：', error);
                 document.getElementById('login-error').textContent = '登录失败：' + error.message;
-            }
-        }
-
-        // 注册功能
-        async function register() {
-            const username = document.getElementById('reg-username').value.trim();
-            const password = document.getElementById('reg-password').value;
-            const email = document.getElementById('reg-email').value.trim();
-            
-            if (!username || !password) {
-                document.getElementById('register-error').textContent = '请输入用户名和密码';
-                return;
-            }
-            
-            const user = new AV.User();
-            user.setUsername(username);
-            user.setPassword(password);
-            if (email) {
-                user.setEmail(email);
-            }
-            
-            try {
-                await user.signUp();
-                console.log('注册成功：', user);
-                document.getElementById('register-success').textContent = '注册成功！正在跳转...';
-                setTimeout(() => {
-                    showMessageBoard(user);
-                }, 1000);
-            } catch (error) {
-                console.error('注册失败：', error);
-                document.getElementById('register-error').textContent = '注册失败：' + error.message;
             }
         }
 
@@ -308,14 +268,17 @@
                 showLogin();
             } catch (error) {
                 console.error('退出登录失败：', error);
+                showLogin(); // 即使出错也跳转到登录页
             }
         }
 
-        // 发表留言
+        // 发表留言 - 安全版
         async function submitMessage() {
+            // 绝对安全检查
             const currentUser = AV.User.current();
-            if (!currentUser) {
+            if (!currentUser || !currentUser.isAuthenticated()) {
                 alert('请先登录！');
+                showLogin();
                 return;
             }
             
@@ -325,30 +288,51 @@
                 return;
             }
             
-            const Message = AV.Object.extend('Message');
-            const message = new Message();
-            message.set('content', content);
-            message.set('author', currentUser);
-            message.set('username', currentUser.getUsername());
-            
             try {
+                // 再次验证用户登录状态
+                await currentUser.fetch();
+                
+                const Message = AV.Object.extend('Message');
+                const message = new Message();
+                message.set('content', content);
+                message.set('author', currentUser);
+                message.set('username', currentUser.getUsername());
+                
                 await message.save();
                 console.log('留言发表成功');
                 document.getElementById('message-input').value = '';
-                loadMessages(); // 重新加载留言
+                loadMessages();
             } catch (error) {
-                console.error('留言失败：', error);
-                alert('留言失败：' + error.message);
+                console.error('验证失败或留言失败：', error);
+                if (error.code === 206 || error.code === 211) {
+                    // 用户未登录或会话过期
+                    alert('登录已过期，请重新登录！');
+                    showLogin();
+                } else {
+                    alert('留言失败：' + error.message);
+                }
             }
         }
 
-        // 加载留言
+        // 加载留言 - 安全版
         async function loadMessages() {
+            // 绝对安全检查
+            const currentUser = AV.User.current();
+            if (!currentUser || !currentUser.isAuthenticated()) {
+                console.log('用户未登录，拒绝加载留言');
+                document.getElementById('messages-container').innerHTML = '<p style="color:red;">请先登录！</p>';
+                showLogin();
+                return;
+            }
+            
             try {
+                // 再次验证用户是否真的已登录（向服务器确认）
+                await currentUser.fetch();
+                
                 const query = new AV.Query('Message');
                 query.include('author');
                 query.descending('createdAt');
-                query.limit(50); // 限制最多显示50条
+                query.limit(50);
                 
                 const messages = await query.find();
                 const container = document.getElementById('messages-container');
@@ -375,17 +359,35 @@
                     
                     container.appendChild(messageDiv);
                 });
+                
+                console.log(`成功加载 ${messages.length} 条留言`);
             } catch (error) {
-                console.error('加载留言失败：', error);
-                document.getElementById('messages-container').innerHTML = '<p>加载留言失败，请刷新页面重试。</p>';
+                console.error('验证失败或加载留言失败：', error);
+                if (error.code === 206 || error.code === 211) {
+                    // 用户未登录或会话过期
+                    document.getElementById('messages-container').innerHTML = '<p style="color:red;">登录已过期，请重新登录！</p>';
+                    showLogin();
+                } else {
+                    document.getElementById('messages-container').innerHTML = '<p style="color:red;">加载留言失败，请刷新页面重试。</p>';
+                }
             }
         }
 
-        // 回车提交留言
+        // 回车提交留言（Ctrl+Enter）
         document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('message-input').addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' && e.ctrlKey) {
-                    submitMessage();
+            const messageInput = document.getElementById('message-input');
+            if (messageInput) {
+                messageInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                        submitMessage();
+                    }
+                });
+            }
+            
+            // 登录表单回车提交
+            document.getElementById('login-password').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    login();
                 }
             });
         });
