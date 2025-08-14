@@ -184,30 +184,13 @@
             serverURL: 'https://iwogpisv.lc-cn-n1-shared.com'    // 替换为你的服务器地址
         });
 
-        // 页面加载时检查登录状态
+        // 页面加载时强制重新登录
         window.onload = function() {
-            checkLoginStatusStrict();
+            // 强制清除登录状态
+            AV.User.logOut();
+            console.log('已强制退出登录，需要重新登录');
+            showLogin();
         };
-
-        // 严格检查登录状态
-        async function checkLoginStatusStrict() {
-            try {
-                const user = AV.User.current();
-                if (!user || !user.isAuthenticated()) {
-                    console.log('用户未登录或认证失效');
-                    showLogin();
-                    return;
-                }
-                
-                // 向服务器验证登录是否有效
-                await user.fetch();
-                console.log('用户验证成功：', user.getUsername());
-                showMessageBoard(user);
-            } catch (error) {
-                console.error('登录验证失败：', error);
-                showLogin();
-            }
-        }
 
         // 显示登录页面
         function showLogin() {
