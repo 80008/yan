@@ -100,29 +100,8 @@
             margin-bottom: 30px;
         }
         
-        .switch-form {
-            text-align: center;
-            margin-top: 20px;
-        }
-        
-        .switch-form a {
-            color: #007bff;
-            text-decoration: none;
-            cursor: pointer;
-        }
-        
-        .switch-form a:hover {
-            text-decoration: underline;
-        }
-        
         .error-msg {
             color: red;
-            margin-top: 10px;
-            text-align: center;
-        }
-        
-        .success-msg {
-            color: green;
             margin-top: 10px;
             text-align: center;
         }
@@ -131,6 +110,26 @@
             text-align: center;
             color: #666;
             font-style: italic;
+        }
+        
+        .refresh-btn {
+            padding: 5px 15px;
+            font-size: 14px;
+            background-color: #28a745;
+            border: none;
+            border-radius: 3px;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .refresh-btn:hover {
+            background-color: #218838;
+        }
+        
+        .refresh-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
         }
     </style>
 </head>
@@ -167,6 +166,12 @@
             <button onclick="submitMessage()">发表留言</button>
             
             <h3>所有留言</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <span style="color: #666; font-size: 14px;">最新留言显示在上方</span>
+                <button onclick="refreshMessages()" class="refresh-btn">
+                    🔄 刷新留言
+                </button>
+            </div>
             <div id="messages-container">
                 <p class="loading">正在加载留言...</p>
             </div>
@@ -191,6 +196,26 @@
             console.log('已强制退出登录，需要重新登录');
             showLogin();
         };
+
+        // 严格检查登录状态
+        async function checkLoginStatusStrict() {
+            try {
+                const user = AV.User.current();
+                if (!user || !user.isAuthenticated()) {
+                    console.log('用户未登录或认证失效');
+                    showLogin();
+                    return;
+                }
+                
+                // 向服务器验证登录是否有效
+                await user.fetch();
+                console.log('用户验证成功：', user.getUsername());
+                showMessageBoard(user);
+            } catch (error) {
+                console.error('登录验证失败：', error);
+                showLogin();
+            }
+        }
 
         // 显示登录页面
         function showLogin() {
@@ -248,10 +273,22 @@
             try {
                 await AV.User.logOut();
                 console.log('退出登录成功');
+                
+                // 清空登录表单
+                document.getElementById('login-username').value = '';
+                document.getElementById('login-password').value = '';
+                clearMessages();
+                
                 showLogin();
             } catch (error) {
                 console.error('退出登录失败：', error);
-                showLogin(); // 即使出错也跳转到登录页
+                
+                // 即使出错也要清空表单
+                document.getElementById('login-username').value = '';
+                document.getElementById('login-password').value = '';
+                clearMessages();
+                
+                showLogin();
             }
         }
 
@@ -294,6 +331,28 @@
                 } else {
                     alert('留言失败：' + error.message);
                 }
+            }
+        }
+
+        // 刷新留言
+        async function refreshMessages() {
+            // 显示刷新状态
+            const refreshBtn = document.querySelector('.refresh-btn');
+            const originalText = refreshBtn.innerHTML;
+            refreshBtn.innerHTML = '🔄 刷新中...';
+            refreshBtn.disabled = true;
+            
+            try {
+                await loadMessages();
+                console.log('留言刷新成功');
+            } catch (error) {
+                console.error('刷新留言失败：', error);
+            } finally {
+                // 恢复按钮状态
+                setTimeout(() => {
+                    refreshBtn.innerHTML = originalText;
+                    refreshBtn.disabled = false;
+                }, 500); // 延迟500ms让用户看到刷新效果
             }
         }
 
